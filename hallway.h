@@ -16,5 +16,8 @@ void hallway();
 CvSeq *hough(IplImage *src, IplImage *dst);
 CvPoint vanishing(CvSeq *lines, IplImage *dst);
 CvSeq *removeNonVPLines(CvSeq *lines, IplImage *img, CvPoint *point);
+void verticallines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori);
+CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, CvSeq *vp);
+CvPoint lineThroughPoint(CvPoint *pt1, CvPoint *pt2);
 
 #endif
