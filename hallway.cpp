@@ -28,7 +28,7 @@ void hallway() {
     cvCvtColor(srcImg, src8bitgray, CV_BGR2GRAY);
     
     // canny edge detection
-    cvCanny(src8bitgray, cannyImg, 210, 255); 
+    cvCanny(src8bitgray, cannyImg, 50, 255); 
 
     // hough to get lines
     CvSeq *lines = hough(cannyImg, houghColorImg);
@@ -60,17 +60,18 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
                           100,
                           0,
                           0);
-    
+        
     for(int i = 0; i < MIN(lines->total,100); i++ ) {
         float *line = (float*)cvGetSeqElem(lines,i);
         float rho = line[0];
         float theta = line[1];
         
         // let's remove those lines that are obviously not hallway
-        if (theta < M_PI / 6 || theta > 5 * M_PI / 6) {
-            cvSeqRemove(lines, i);
-            continue;
-        }
+//        if (theta < M_PI / 6 || theta > 5 * M_PI / 6) {
+//            cvSeqRemove(lines, i);
+//            cout << "removing: " << i << endl;
+//            continue;
+//        }
         
         CvPoint pt1, pt2;
         double a = cos(theta), b = sin(theta);
@@ -85,13 +86,15 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
     return lines;
 }
 
-CvMat *vanishing(CvSeq *lines, IplImage *dst) {
+CvMat *vanishing(CvSeq *lines, IplImage *dst) {    
     CvMat *A = cvCreateMat(2, 2, CV_64FC1);
     CvMat *A1 = cvCreateMat(2, 2, CV_64FC1);
     CvMat *b = cvCreateMat(2, 1, CV_64FC1);
     CvMat *x = cvCreateMat(2, 1, CV_64FC1);
     
     // cluster to get two predominant lines
+    
+    // find the intersection between the two lines
     for (int i = 0; i < 2; i++) {
         float *line = (float*)cvGetSeqElem(lines, i);
         float rho = line[0];
@@ -102,7 +105,6 @@ CvMat *vanishing(CvSeq *lines, IplImage *dst) {
         cvmSet(b, i, 0, rho);
     }
     
-    // find the intersection of the lines
     cvInvert(A, A1);
     cvMatMul(A1, b, x);
     
