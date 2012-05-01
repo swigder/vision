@@ -14,21 +14,30 @@ using namespace cv;
 void openfile() {
     IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);
     
+    // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
-    IplImage *cannyImg = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
-
-    IplImage *dstImg = cvCreateImage(cvGetSize(srcImg), 8, 1);
-    IplImage *dstColorImg = cvCreateImage( cvGetSize(srcImg), 8, 3 );
     
+    // store the canny edges
+    IplImage *cannyImg = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
+    
+    // store the image with lines overlaid
+    IplImage *houghColorImg = cvCreateImage( cvGetSize(srcImg), 8, 3 );
+    cvCopy(srcImg, houghColorImg);
+    
+    // some storage for fun
     CvMemStorage* storage = cvCreateMemStorage(0);
+    
+    // store the lines from hough
     CvSeq *lines = 0;
     
-    cvCvtColor(srcImg, src8bitgray, CV_BGR2GRAY); 
+    // need grayscale, 8-bit image for canny and hough
+    cvCvtColor(srcImg, src8bitgray, CV_BGR2GRAY);
+    
+    // canny edge detection
     cvCanny(src8bitgray, cannyImg, 100, 200); 
+//    cvCvtColor(cannyImg, dstColorImg, CV_GRAY2BGR);
     
-    cvCvtColor(cannyImg, dstColorImg, CV_GRAY2BGR);
-    
-    lines = cvHoughLines2(dstImg,
+    lines = cvHoughLines2(cannyImg,
                           storage,
                           CV_HOUGH_STANDARD,
                           1,
@@ -48,17 +57,17 @@ void openfile() {
         pt1.y = cvRound(y0 + 1000*(a));
         pt2.x = cvRound(x0 - 1000*(-b));
         pt2.y = cvRound(y0 - 1000*(a));
-        cvLine(dstColorImg, pt1, pt2, CV_RGB(255,0,0), 3, 8 );
+        cvLine(houghColorImg, pt1, pt2, CV_RGB(255,0,0), 3, 8 );
     }
     
     cvNamedWindow("Source", 1);
     cvShowImage("Source", srcImg);
     
     cvNamedWindow("Canny", 1);
-    cvShowImage("Canny", dstColorImg);
+    cvShowImage("Canny", cannyImg);
     
     cvNamedWindow("Hough", 1);
-    cvShowImage("Canny", dstColorImg);
+    cvShowImage("Hough", houghColorImg);
     
     cvWaitKey();
 }
