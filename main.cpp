@@ -4,8 +4,7 @@
 #include "hallway.h"
 
 int main (int argc, const char * argv[]) {
-    openfile();
+    hallway();
     
     return 0;
-    
 }

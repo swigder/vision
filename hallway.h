@@ -9,6 +9,11 @@
 #ifndef vision_hallway_h
 #define vision_hallway_h
 
-void openfile();
+#include <iostream>
+using namespace std;
+
+void hallway();
+CvSeq *hough(IplImage *src, IplImage *dst);
+void vanishing(CvSeq *lines);
 
 #endif
