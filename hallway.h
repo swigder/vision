@@ -15,5 +15,6 @@ using namespace std;
 void hallway();
 CvSeq *hough(IplImage *src, IplImage *dst);
 CvPoint vanishing(CvSeq *lines, IplImage *dst);
+CvSeq *removeNonVPLines(CvSeq *lines, IplImage *img, CvPoint *point);
 
 #endif

@@ -36,6 +36,9 @@ void hallway() {
     // get vanishing point
     CvPoint point = vanishing(lines, houghColorImg);
     
+    // get lines that go through vp
+    CvSeq *vpLines = removeNonVPLines(lines, houghColorImg, &point);
+    
     // display what we've done
     cvNamedWindow("Source", 1);
     cvShowImage("Source", srcImg);
@@ -60,28 +63,6 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
                           100,
                           0,
                           0);
-        
-    for(int i = 0; i < MIN(lines->total,100); i++ ) {
-        float *line = (float*)cvGetSeqElem(lines,i);
-        float rho = line[0];
-        float theta = line[1];
-        
-        // let's remove those lines that are obviously not hallway
-//        if (theta < M_PI / 6 || theta > 5 * M_PI / 6) {
-//            cvSeqRemove(lines, i);
-//            cout << "removing: " << i << endl;
-//            continue;
-//        }
-        
-        CvPoint pt1, pt2;
-        double a = cos(theta), b = sin(theta);
-        double x0 = a*rho, y0 = b*rho;
-        pt1.x = cvRound(x0 + 1000*(-b));
-        pt1.y = cvRound(y0 + 1000*(a));
-        pt2.x = cvRound(x0 - 1000*(-b));
-        pt2.y = cvRound(y0 - 1000*(a));
-        cvLine(dst, pt1, pt2, CV_RGB(255,0,0), 2, 8);
-    }
     
     return lines;
 }
@@ -89,6 +70,11 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
 CvPoint vanishing(CvSeq *lines, IplImage *dst) { 
     CvSize size = cvGetSize(dst);
     int pixels[size.width][size.height];
+    for (int i = 0; i < size.width; i++) {
+        for (int j = 0; j < size.height; j++) {
+            pixels[i][j] = 0;
+        }
+    }
     
     CvMat *A = cvCreateMat(2, 2, CV_64FC1);
     CvMat *A1 = cvCreateMat(2, 2, CV_64FC1);
@@ -118,23 +104,65 @@ CvPoint vanishing(CvSeq *lines, IplImage *dst) {
             double x0 = cvmGet(x, 0, 0);
             double y0 = cvmGet(x, 1, 0);
             
-            if (x0 >= 0 && x0 <= size.width && y0 >= 0 && y0 <= size.height)
-                pixels[cvRound(x0)][cvRound(y0)]++;
+            if (x0 > 0 && x0 < size.width && y0 > 0 && y0 < size.height) {
+                pixels[int(x0)][int(y0)]++;
+            }
         }
     }
     
     CvPoint vp;
     int max = -1;
-    for (int i = 0; i < size.width; i++) {
-        for (int j = 0; j < size.height; j++) {
-            if (pixels[i][j] > max) {
-                max = pixels[i][j];
-                vp = cvPoint(i, j);
+    int tmpmax = 0;
+    for (int i = 0; i < size.width - 5; i+=5) {
+        for (int j = 0; j < size.height - 5; j+=5) {
+            tmpmax = 0;
+            for (int k = 0; k < 5; k++) {
+                for (int l = 0; l < 5; l++) {
+                    tmpmax += pixels[i+k][j+l];
+                }
+            }
+            if (tmpmax > max) {
+                max = tmpmax;
+                vp = cvPoint(i + 3, j + 3);
             }
         }
     }
     
-    cvCircle(dst, vp, 10, CV_RGB(0,255,0));
-    
+    cout << "max: " << max << endl;
+    cout << "point: " << vp.x << ", " << vp.y << endl;
+            
     return vp;
+}
+
+CvSeq *removeNonVPLines(CvSeq *lines, IplImage *img, CvPoint *vp) {
+    CvSeq *retLines = cvCloneSeq(lines);
+    
+    int total = lines->total;
+    for (int i = 0; i < total; i++) {
+        float *line = (float*)cvGetSeqElem(lines,i);
+        float rho = line[0];
+        float theta = line[1];
+        
+        // check if line goes through vp
+        // don't forget to check for nan!
+        double exy = -cos(theta) / sin(theta) * vp->x + rho / sin(theta);
+        if (exy != exy || vp->y > exy + 5 || vp->y < exy - 5) {
+//            cvSeqRemove(retLines, i);
+            continue;
+        }
+                
+        CvPoint pt1, pt2;
+        double a = cos(theta), b = sin(theta);
+        double x0 = a*rho, y0 = b*rho;
+        pt1.x = cvRound(x0 + 1000*(-b));
+        pt1.y = cvRound(y0 + 1000*(a));
+        pt2.x = cvRound(x0 - 1000*(-b));
+        pt2.y = cvRound(y0 - 1000*(a));
+        
+        cvLine(img, pt1, pt2, CV_RGB(255,0,0), 2, 8);
+    }
+    
+    cvCircle(img, *vp, 10, CV_RGB(0,255,0));
+    
+    return retLines;
 }
