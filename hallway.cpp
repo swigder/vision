@@ -34,7 +34,7 @@ void hallway() {
     CvSeq *lines = hough(cannyImg, houghColorImg);
     
     // get vanishing point
-    CvMat *point = vanishing(lines, houghColorImg);
+    CvPoint point = vanishing(lines, houghColorImg);
     
     // display what we've done
     cvNamedWindow("Source", 1);
@@ -86,34 +86,55 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
     return lines;
 }
 
-CvMat *vanishing(CvSeq *lines, IplImage *dst) {    
+CvPoint vanishing(CvSeq *lines, IplImage *dst) { 
+    CvSize size = cvGetSize(dst);
+    int pixels[size.width][size.height];
+    
     CvMat *A = cvCreateMat(2, 2, CV_64FC1);
     CvMat *A1 = cvCreateMat(2, 2, CV_64FC1);
     CvMat *b = cvCreateMat(2, 1, CV_64FC1);
     CvMat *x = cvCreateMat(2, 1, CV_64FC1);
     
-    // cluster to get two predominant lines
-    
-    // find the intersection between the two lines
-    for (int i = 0; i < 2; i++) {
-        float *line = (float*)cvGetSeqElem(lines, i);
-        float rho = line[0];
-        float theta = line[1];
-                        
-        cvmSet(A, i, 0, cos(theta));
-        cvmSet(A, i, 1, sin(theta));
-        cvmSet(b, i, 0, rho);
+    int total = lines->total;
+    for (int i = 0; i < total; i++) {
+        for (int j = i + 1; j < total; j++) {
+            float *line1 = (float*)cvGetSeqElem(lines, i);
+            float *line2 = (float*)cvGetSeqElem(lines, j);
+            float rho1 = line1[0];
+            float theta1 = line1[1];
+            float rho2 = line2[0];
+            float theta2 = line2[1];
+            
+            cvmSet(A, 0, 0, cos(theta1));
+            cvmSet(A, 0, 1, sin(theta1));
+            cvmSet(A, 1, 0, cos(theta2));
+            cvmSet(A, 1, 1, sin(theta2));
+            cvmSet(b, 0, 0, rho1);
+            cvmSet(b, 1, 0, rho2);
+            
+            cvInvert(A, A1);
+            cvMatMul(A1, b, x);
+            
+            double x0 = cvmGet(x, 0, 0);
+            double y0 = cvmGet(x, 1, 0);
+            
+            if (x0 >= 0 && x0 <= size.width && y0 >= 0 && y0 <= size.height)
+                pixels[cvRound(x0)][cvRound(y0)]++;
+        }
     }
     
-    cvInvert(A, A1);
-    cvMatMul(A1, b, x);
+    CvPoint vp;
+    int max = -1;
+    for (int i = 0; i < size.width; i++) {
+        for (int j = 0; j < size.height; j++) {
+            if (pixels[i][j] > max) {
+                max = pixels[i][j];
+                vp = cvPoint(i, j);
+            }
+        }
+    }
     
-    double x0 = cvmGet(x, 0, 0);
-    double y0 = cvmGet(x, 1, 0);
+    cvCircle(dst, vp, 10, CV_RGB(0,255,0));
     
-    cout << x0 << endl << y0 << endl;
-    
-    cvCircle(dst, cvPoint(x0, y0), 10, CV_RGB(0,255,0));
-
-    return x;
+    return vp;
 }

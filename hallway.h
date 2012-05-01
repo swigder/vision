@@ -14,6 +14,6 @@ using namespace std;
 
 void hallway();
 CvSeq *hough(IplImage *src, IplImage *dst);
-CvMat *vanishing(CvSeq *lines, IplImage *dst);
+CvPoint vanishing(CvSeq *lines, IplImage *dst);
 
 #endif
