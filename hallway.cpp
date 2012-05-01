@@ -23,10 +23,6 @@ void hallway() {
     // store the image with lines overlaid
     IplImage *houghColorImg = cvCreateImage(cvGetSize(srcImg), 8, 3);
     cvCopy(srcImg, houghColorImg);
-
-    
-    // store the lines from hough
-    CvSeq *lines = 0;
     
     // need grayscale, 8-bit image for canny and hough
     cvCvtColor(srcImg, src8bitgray, CV_BGR2GRAY);
@@ -35,9 +31,10 @@ void hallway() {
     cvCanny(src8bitgray, cannyImg, 210, 255); 
 
     // hough to get lines
-    lines = hough(cannyImg, houghColorImg);
+    CvSeq *lines = hough(cannyImg, houghColorImg);
     
     // get vanishing point
+    CvMat *point = vanishing(lines, houghColorImg);
     
     // display what we've done
     cvNamedWindow("Source", 1);
@@ -88,21 +85,34 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
     return lines;
 }
 
-void vanishing(CvSeq *lines) {
-    Mat A(2, 2, CV_8UC1);
-    Mat x(1, 2, CV_8UC1);
-    Mat b(1, 2, CV_8UC1);
+CvMat *vanishing(CvSeq *lines, IplImage *dst) {
+    CvMat *A = cvCreateMat(2, 2, CV_64FC1);
+    CvMat *b = cvCreateMat(2, 1, CV_64FC1);
+    CvMat *x = cvCreateMat(2, 1, CV_64FC1);
     
     // cluster to get two predominant lines
-    for (int i = 0; i < 2; i++) {
-        float *line = (float*)cvGetSeqElem(lines,i);
+    for (int j = 1; j < 3; j++) {
+        float *line = (float*)cvGetSeqElem(lines,j);
         float rho = line[0];
         float theta = line[1];
+                
+        int i = j-1;
+        
         cvmSet(A, i, 0, cos(theta));
         cvmSet(A, i, 1, sin(theta));
         cvmSet(b, i, 0, rho);
     }
     
     // find the intersection of the lines
-    divide(A, b, x);
+    cvInvert(A, A);
+    cvMatMul(A, b, x);
+    
+    double x0 = cvmGet(x, 0, 0);
+    double y0 = cvmGet(x, 1, 0);
+    
+    cout << x0 << endl << y0 << endl;
+    
+    cvCircle(dst, cvPoint(x0, y0), 10, CV_RGB(0,255,0));
+
+    return x;
 }
