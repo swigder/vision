@@ -87,11 +87,12 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
 
 CvMat *vanishing(CvSeq *lines, IplImage *dst) {
     CvMat *A = cvCreateMat(2, 2, CV_64FC1);
+    CvMat *A1 = cvCreateMat(2, 2, CV_64FC1);
     CvMat *b = cvCreateMat(2, 1, CV_64FC1);
     CvMat *x = cvCreateMat(2, 1, CV_64FC1);
     
     // cluster to get two predominant lines
-    for (int i = 1; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
         float *line = (float*)cvGetSeqElem(lines, i);
         float rho = line[0];
         float theta = line[1];
@@ -102,8 +103,8 @@ CvMat *vanishing(CvSeq *lines, IplImage *dst) {
     }
     
     // find the intersection of the lines
-    cvInvert(A, A);
-    cvMatMul(A, b, x);
+    cvInvert(A, A1);
+    cvMatMul(A1, b, x);
     
     double x0 = cvmGet(x, 0, 0);
     double y0 = cvmGet(x, 1, 0);
