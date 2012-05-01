@@ -91,13 +91,11 @@ CvMat *vanishing(CvSeq *lines, IplImage *dst) {
     CvMat *x = cvCreateMat(2, 1, CV_64FC1);
     
     // cluster to get two predominant lines
-    for (int j = 1; j < 3; j++) {
-        float *line = (float*)cvGetSeqElem(lines,j);
+    for (int i = 1; i < 3; i++) {
+        float *line = (float*)cvGetSeqElem(lines, i);
         float rho = line[0];
         float theta = line[1];
-                
-        int i = j-1;
-        
+                        
         cvmSet(A, i, 0, cos(theta));
         cvmSet(A, i, 1, sin(theta));
         cvmSet(b, i, 0, rho);
