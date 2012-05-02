@@ -12,8 +12,8 @@
 using namespace cv;
 
 void hallway() {
-//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
-    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
+    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
+//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
     
     // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
@@ -53,11 +53,11 @@ void hallway() {
     CvSeq *intPoints = interVertHoriVP(src8bitgray, houghColorImg, vert, hori, vpLines);
     
     // display what we've done
-    cvNamedWindow("Source", 1);
-    cvShowImage("Source", srcImg);
-    
-    cvNamedWindow("Canny", 1);
-    cvShowImage("Canny", cannyImg);
+//    cvNamedWindow("Source", 1);
+//    cvShowImage("Source", srcImg);
+//    
+//    cvNamedWindow("Canny", 1);
+//    cvShowImage("Canny", cannyImg);
     
     cvNamedWindow("Hough", 1);
     cvShowImage("Hough", houghColorImg);
@@ -220,43 +220,13 @@ void verticallines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori) {
 }
 
 CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, CvSeq *vp) {
-    CvSize size = cvGetSize(dst);
-    int pixels[size.width][size.height];
-    for (int i = 0; i < size.width; i++) {
-        for (int j = 0; j < size.height; j++) {
-            pixels[i][j] = 0;
-        }
-    }
-    
     IplImage *cannyImg = cvCreateImage(cvGetSize(src), IPL_DEPTH_8U, 1);
-    cvCanny(src, cannyImg, 1, 2); 
+    cvCanny(src, cannyImg, 50, 100); 
     
-    CvMemStorage* storage = cvCreateMemStorage(0);
-    CvSeq *linesProb = cvHoughLines2(cannyImg,
-                                     storage,
-                                     CV_HOUGH_PROBABILISTIC,
-                                     1,
-                                     CV_PI/180,
-                                     5,
-                                     5,
-                                     5);
+    cvNamedWindow("Canny", 1);
+    cvShowImage("Canny", cannyImg);
     
-    for (int i = 0; i < linesProb->total; i++) {
-        CvPoint* line = (CvPoint*)cvGetSeqElem(linesProb,i);
-        if (line[0].x == line[1].x) {
-            for (int j = min(line[0].y, line[1].y); j < max(line[0].y, line[1].y); j++) {
-                pixels[line[0].x][j]++;
-            }
-            cvLine(dst, line[0], line[1], CV_RGB(0,255,0), 1, 8);
-        }
-        if (line[0].y == line[1].y) {
-            for (int j = min(line[0].x, line[1].x); j < max(line[0].x, line[1].x); j++) {
-                pixels[j][line[0].y]+=2;
-            } 
-            cvLine(dst, line[0], line[1], CV_RGB(0,0,255), 1, 8);
-        }
-    }
-
+    Mat cannyMat(cannyImg);
     
     CvMat *A = cvCreateMat(2, 2, CV_64FC1);
     CvMat *A1 = cvCreateMat(2, 2, CV_64FC1);
@@ -286,21 +256,11 @@ CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, C
                 double x0 = cvmGet(x, 0, 0);
                 double y0 = cvmGet(x, 1, 0);
                 
-                int inter = 0;
-                for (int i = x0 - 1; i <= x0 + 1; i++) {
-                    for (int j = y0 - 1; j <= y0 + 1; j++) {
-                        if (pixels[i][j] == 3) {
-                            inter += 3;
-                        }
-                        else if (pixels[i][j] == 2 && inter != 2) {
-                            inter += 2;
-                        }
-                        else if (pixels[i][j] == 1 && inter != 1) {
-                            inter += 1;
-                        }
-                    }
+                int total = 0;
+                for (int i = y0; i > y0 - 15 && i > 0; i--) {
+                    total += cannyMat.at<int>(x0, i) != 0;
                 }
-                if (inter < 3) {
+                if (total < 15) {
                     continue;
                 }
                 
