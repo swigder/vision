@@ -12,8 +12,8 @@
 using namespace cv;
 
 void hallway() {
-    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
-//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
+//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
+    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
     
     // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
@@ -220,57 +220,35 @@ void verticallines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori) {
 }
 
 CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, CvSeq *vp) {
+    int i, corner_count = 150;
+
+    IplImage *eig_img, *temp_img;
+    CvPoint2D32f *corners;
+
+    eig_img = cvCreateImage (cvGetSize(src), IPL_DEPTH_32F, 1);
+	temp_img = cvCreateImage(cvGetSize (src), IPL_DEPTH_32F, 1);
+	corners = (CvPoint2D32f *)cvAlloc(corner_count * sizeof(CvPoint2D32f));
+    
+	cvGoodFeaturesToTrack (src, eig_img, temp_img, corners, &corner_count, 0.1, 15);
+	cvFindCornerSubPix (src, corners, corner_count,
+                        cvSize (3, 3), cvSize (-1, -1), cvTermCriteria (CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.03));
+	
     IplImage *cannyImg = cvCreateImage(cvGetSize(src), IPL_DEPTH_8U, 1);
-    cvCanny(src, cannyImg, 50, 100); 
+    cvCanny(src, cannyImg, 50, 255); 
     
-    cvNamedWindow("Canny", 1);
-    cvShowImage("Canny", cannyImg);
-    
-    Mat cannyMat(cannyImg);
-    
-    CvMat *A = cvCreateMat(2, 2, CV_64FC1);
-    CvMat *A1 = cvCreateMat(2, 2, CV_64FC1);
-    CvMat *b = cvCreateMat(2, 1, CV_64FC1);
-    CvMat *x = cvCreateMat(2, 1, CV_64FC1);
-    
-    for (int i = 0; i < vert->total; i++) {
-        for (int j = 0; j < hori->total; j++) {
+    for (i = 0; i < corner_count; i++) {
+        CvPoint point = cvPointFrom32f(corners[i]);
+        if (cvGet2D(cannyImg, point.y - 1, point.x).val[0] != 0 && (cvGet2D(cannyImg, point.y, point.x - 1).val[0] != 0 || cvGet2D(cannyImg, point.y - 1, point.x).val[0] != 0)) {
+            cvCircle(dst, point, 3, CV_RGB (0, 255, 0), 2);
+            
             for (int k = 0; k < vp->total; k++) {
-                float *line1 = (float*)cvGetSeqElem(vert, i);
-                float *line2 = (float*)cvGetSeqElem(hori, j);
-                float rho1 = line1[0];
-                float theta1 = line1[1];
-                float rho2 = line2[0];
-                float theta2 = line2[1];
+                float *line = (float*)cvGetSeqElem(vp,k);
+                float rho = line[0];
+                float theta = line[1];
                 
-                cvmSet(A, 0, 0, cos(theta1));
-                cvmSet(A, 0, 1, sin(theta1));
-                cvmSet(A, 1, 0, cos(theta2));
-                cvmSet(A, 1, 1, sin(theta2));
-                cvmSet(b, 0, 0, rho1);
-                cvmSet(b, 1, 0, rho2);
-                
-                cvInvert(A, A1);
-                cvMatMul(A1, b, x);
-                
-                double x0 = cvmGet(x, 0, 0);
-                double y0 = cvmGet(x, 1, 0);
-                
-                int total = 0;
-                for (int i = y0; i > y0 - 15 && i > 0; i--) {
-                    total += cannyMat.at<int>(x0, i) != 0;
-                }
-                if (total < 15) {
-                    continue;
-                }
-                
-                float *line3 = (float*)cvGetSeqElem(vp,k);
-                float rho = line3[0];
-                float theta = line3[1];
-                
-                double exy = -cos(theta) / sin(theta) * x0 + rho / sin(theta);
-                if (exy == exy && abs(y0 - exy) < 5) {
-                    cvCircle(dst, cvPoint(x0, y0), 10, CV_RGB(0,255,0));
+                double exy = -cos(theta) / sin(theta) * point.x + rho / sin(theta);
+                if (exy == exy && abs(point.y - exy) < 5) {
+                    cvCircle(dst, cvPoint(point.x, point.y), 10, CV_RGB(0,0,255));
                 }
             }
         }
