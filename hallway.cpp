@@ -12,8 +12,8 @@
 using namespace cv;
 
 void hallway() {
-//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
-    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
+    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
+//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
     
     // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
@@ -34,6 +34,12 @@ void hallway() {
     // hough to get lines
     CvSeq *lines = hough(cannyImg, houghColorImg);
     
+    // get lines with vertical intersection
+//    CvSeq *vlines = removeNonInterVertLines(lines, src8bitgray);
+    
+    // get vertical line segments
+    CvSeq *vertlines = verticalLineSegments(src8bitgray, houghColorImg);
+    
     // get vanishing point
     CvPoint point = vanishing(lines, houghColorImg);
     
@@ -50,7 +56,7 @@ void hallway() {
     verticallines(src8bitgray, houghColorImg, vert, hori);
     
     // get the intersections of vert, hori, vp
-    CvSeq *intPoints = interVertHoriVP(src8bitgray, houghColorImg, vert, hori, vpLines);
+    CvSeq *intPoints = interCornerVP(src8bitgray, houghColorImg, vert, hori, vpLines);
     
     // display what we've done
 //    cvNamedWindow("Source", 1);
@@ -64,6 +70,77 @@ void hallway() {
     
     cvWaitKey();
 }
+
+void drawLinesPoints(CvSeq *lines, IplImage *img, CvScalar color = CV_RGB(255,0,0)) {    
+    for (int i = 0; i < lines->total; i++ ) {
+        CvPoint* line = (CvPoint*)cvGetSeqElem(lines, i);
+        cvLine(img, line[0], line[1], color, 3, 8 );
+    }
+}
+
+void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color = CV_RGB(255,0,0)) {
+    int total = lines->total;
+    for (int i = 0; i < total; i++) {
+        float *line = (float*)cvGetSeqElem(lines,i);
+        float rho = line[0];
+        float theta = line[1];        
+        
+        CvPoint pt1, pt2;
+        double a = cos(theta), b = sin(theta);
+        double x0 = a*rho, y0 = b*rho;
+        pt1.x = cvRound(x0 + 1000*(-b));
+        pt1.y = cvRound(y0 + 1000*(a));
+        pt2.x = cvRound(x0 - 1000*(-b));
+        pt2.y = cvRound(y0 - 1000*(a));
+        
+        cvLine(img, pt1, pt2, color, 2, 8);
+    }    
+}
+
+CvSeq *linesContainingPoints(CvSeq *lines, CvSeq *points) {
+    CvMemStorage* storage = cvCreateMemStorage(0);
+    CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storage);
+    
+    int total = lines->total;
+    for (int i = 0; i < total; i++) {
+        float *line = (float*)cvGetSeqElem(lines,i);
+        float rho = line[0];
+        float theta = line[1];
+        
+        for (int j = 0; j < points->total; j++) {
+            CvPoint* point = (CvPoint *)cvGetSeqElem(points,j);
+            
+            // check if line goes through point
+            // don't forget to check for nan!
+            double exy = -cos(theta) / sin(theta) * point->x + rho / sin(theta);
+            if (exy == exy && (point->y - exy) < 5) {
+                cvSeqPush(retLines, line);;
+            }
+        }
+    }
+        
+    return retLines;
+}
+
+CvSeq *linesContainingPoint(CvSeq *lines, CvPoint *point) {
+    CvMemStorage* storage = cvCreateMemStorage(0);
+    CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storage);
+    
+    int total = lines->total;
+    for (int i = 0; i < total; i++) {
+        float *line = (float*)cvGetSeqElem(lines,i);
+        float rho = line[0];
+        float theta = line[1];
+        
+        double exy = -cos(theta) / sin(theta) * point->x + rho / sin(theta);
+        if (exy == exy && (point->y - exy) < 5) {
+            cvSeqPush(retLines, line);;
+        }
+    }
+    
+    return retLines;
+}
+
 
 CvSeq *hough(IplImage *src, IplImage *dst) {
     CvMemStorage* storage = cvCreateMemStorage(0);
@@ -147,35 +224,47 @@ CvPoint vanishing(CvSeq *lines, IplImage *dst) {
     return vp;
 }
 
-CvSeq *removeNonVPLines(CvSeq *lines, IplImage *img, CvPoint *vp) {
+CvSeq *removeNonInterVertLines(CvSeq *lines, IplImage *src) {
     CvMemStorage* storage = cvCreateMemStorage(0);
     CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storage);
     
-    int total = lines->total;
-    for (int i = 0; i < total; i++) {
-        float *line = (float*)cvGetSeqElem(lines,i);
-        float rho = line[0];
-        float theta = line[1];
-        
-        // check if line goes through vp
-        // don't forget to check for nan!
-        double exy = -cos(theta) / sin(theta) * vp->x + rho / sin(theta);
-        if (exy != exy || vp->y > exy + 5 || vp->y < exy - 5) {
-            continue;
-        }
-        
-        cvSeqPush(retLines, line);
+    int i, corner_count = 150;
+    
+    IplImage *eig_img, *temp_img;
+    CvPoint2D32f *corners;
+    
+    eig_img = cvCreateImage (cvGetSize(src), IPL_DEPTH_32F, 1);
+	temp_img = cvCreateImage(cvGetSize (src), IPL_DEPTH_32F, 1);
+	corners = (CvPoint2D32f *)cvAlloc(corner_count * sizeof(CvPoint2D32f));
+    
+	cvGoodFeaturesToTrack (src, eig_img, temp_img, corners, &corner_count, 0.1, 15);
+	cvFindCornerSubPix (src, corners, corner_count,
+                        cvSize (3, 3), cvSize (-1, -1), cvTermCriteria (CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.03));
+	
+    IplImage *cannyImg = cvCreateImage(cvGetSize(src), IPL_DEPTH_8U, 1);
+    cvCanny(src, cannyImg, 50, 255); 
+    
+    for (i = 0; i < corner_count; i++) {
+        CvPoint point = cvPointFrom32f(corners[i]);
+        if ((cvGet2D(cannyImg, point.y - 1, point.x).val[0] != 0 || cvGet2D(cannyImg, point.y + 1, point.x).val[0] != 0)) {            
+            for (int k = 0; k < lines->total; k++) {
+                float *line = (float*)cvGetSeqElem(lines,k);
+                float rho = line[0];
+                float theta = line[1];
                 
-        CvPoint pt1, pt2;
-        double a = cos(theta), b = sin(theta);
-        double x0 = a*rho, y0 = b*rho;
-        pt1.x = cvRound(x0 + 1000*(-b));
-        pt1.y = cvRound(y0 + 1000*(a));
-        pt2.x = cvRound(x0 - 1000*(-b));
-        pt2.y = cvRound(y0 - 1000*(a));
-        
-        cvLine(img, pt1, pt2, CV_RGB(255,0,0), 2, 8);
+                double exy = -cos(theta) / sin(theta) * point.x + rho / sin(theta);
+                if (exy == exy && abs(point.y - exy) < 5) {
+                    cvSeqPush(retLines, line);
+                }
+            }
+        }
     }
+
+    return retLines;
+}
+
+CvSeq *removeNonVPLines(CvSeq *lines, IplImage *img, CvPoint *vp) {
+    CvSeq *retLines = linesContainingPoint(lines, vp);
     
     cvCircle(img, *vp, 10, CV_RGB(0,255,0));
     
@@ -219,7 +308,37 @@ void verticallines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori) {
     }
 }
 
-CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, CvSeq *vp) {
+CvSeq *verticalLineSegments(IplImage *src, IplImage *dst) {
+    CvMemStorage* storageret = cvCreateMemStorage(0);
+    CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageret);
+    
+    IplImage *cannyImg = cvCreateImage(cvGetSize(src), IPL_DEPTH_8U, 1);
+    cvCanny(src, cannyImg, 5, 10); 
+    
+    CvMemStorage* storage = cvCreateMemStorage(0);
+    CvSeq *lines = cvHoughLines2(cannyImg,
+                                 storage,
+                                 CV_HOUGH_PROBABILISTIC,
+                                 1,
+                                 CV_PI/180,
+                                 50,
+                                 10,
+                                 0);
+    
+    for (int i = 0; i < lines->total; i++ ) {
+        CvPoint* line = (CvPoint*)cvGetSeqElem(lines, i);
+        if (line[0].x == line[1].x) {
+            cvSeqPush(retLines, line);
+        }
+    }
+
+    return lines;
+}
+
+CvSeq *interCornerVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, CvSeq *vp) {
+    CvMemStorage* storageret = cvCreateMemStorage(0);
+    CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageret);
+    
     int i, corner_count = 150;
 
     IplImage *eig_img, *temp_img;
@@ -247,12 +366,16 @@ CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, C
                 float theta = line[1];
                 
                 double exy = -cos(theta) / sin(theta) * point.x + rho / sin(theta);
-                if (exy == exy && abs(point.y - exy) < 5) {
+                if (exy == exy && abs(point.y - exy) < 1) {
                     cvCircle(dst, cvPoint(point.x, point.y), 10, CV_RGB(0,0,255));
                 }
+                
+                cvSeqPush(retLines, line);
             }
         }
     }
+    
+    return retLines;
 }
 
 CvPoint lineThroughPoint(CvPoint *pt1, CvPoint *pt2) {
