@@ -12,7 +12,7 @@
 using namespace cv;
 
 void hallway() {
-    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);
+    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
     
     // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
@@ -196,15 +196,6 @@ void verticallines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori) {
                                      0,
                                      0);
     
-    CvSeq *linesProb = cvHoughLines2(cannyImg,
-                                 storage,
-                                 CV_HOUGH_PROBABILISTIC,
-                                 1,
-                                 CV_PI/180,
-                                 100,
-                                 0,
-                                 0);
-    
     for (int i = 0; i < linesStand->total; i++) {
         float *line = (float*)cvGetSeqElem(linesStand,i);
         float rho = line[0];
@@ -219,29 +210,53 @@ void verticallines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori) {
         pt2.y = cvRound(y0 - 1000*(a));
         
         if (abs(pt1.x - pt2.x) < 10) {
-//            cvLine(dst, pt1, pt2, CV_RGB(0,0,255), 2, 8);
             cvSeqPush(vert, line);
         }
         else if (abs(pt1.y - pt2.y) < 10) {
-//            cvLine(dst, pt1, pt2, CV_RGB(0,0,255), 2, 8);
             cvSeqPush(hori, line);
         }
     }
-    
-//    for(int i = 0; i < linesProb->total; i++) {
-//        CvPoint* line = (CvPoint*)cvGetSeqElem(linesProb,i);
-//        if (abs(line[0].x - line[1].x) < 10) {
-//            cvSeqPush(vert, line);
-////            cvLine(dst, line[0], line[1], CV_RGB(0,0,255), 2, 8);
-//        }
-//        else if (abs(line[0].y - line[1].y) < 10) {
-//            cvSeqPush(hori, line);
-////            cvLine(dst, line[0], line[1], CV_RGB(0,0,255), 2, 8);
-//        }
-//    }
 }
 
 CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, CvSeq *vp) {
+    CvSize size = cvGetSize(dst);
+    int pixels[size.width][size.height];
+    for (int i = 0; i < size.width; i++) {
+        for (int j = 0; j < size.height; j++) {
+            pixels[i][j] = 0;
+        }
+    }
+    
+    IplImage *cannyImg = cvCreateImage(cvGetSize(src), IPL_DEPTH_8U, 1);
+    cvCanny(src, cannyImg, 1, 2); 
+    
+    CvMemStorage* storage = cvCreateMemStorage(0);
+    CvSeq *linesProb = cvHoughLines2(cannyImg,
+                                     storage,
+                                     CV_HOUGH_PROBABILISTIC,
+                                     1,
+                                     CV_PI/180,
+                                     100,
+                                     0,
+                                     0);
+    
+    for (int i = 0; i < linesProb->total; i++) {
+        CvPoint* line = (CvPoint*)cvGetSeqElem(linesProb,i);
+        if (line[0].x == line[1].x) {
+            for (int j = min(line[0].y, line[1].y); j < max(line[0].y, line[1].y); j++) {
+                pixels[line[0].x][j]++;
+            }
+            cvLine(dst, line[0], line[1], CV_RGB(0,255,0), 1, 8);
+        }
+        if (line[0].y == line[1].y) {
+            for (int j = min(line[0].x, line[1].x); j < max(line[0].x, line[1].x); j++) {
+                pixels[j][line[0].y]++;
+            } 
+            cvLine(dst, line[0], line[1], CV_RGB(0,0,255), 1, 8);
+        }
+    }
+
+    
     CvMat *A = cvCreateMat(2, 2, CV_64FC1);
     CvMat *A1 = cvCreateMat(2, 2, CV_64FC1);
     CvMat *b = cvCreateMat(2, 1, CV_64FC1);
@@ -267,29 +282,13 @@ CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, C
                 cvInvert(A, A1);
                 cvMatMul(A1, b, x);
                 
-//                CvPoint* line1 = (CvPoint*)cvGetSeqElem(vert,i);
-//                CvPoint* line2 = (CvPoint*)cvGetSeqElem(hori,j);
-//
-//                CvPoint linevert = lineThroughPoint(&line1[0], &line1[1]);
-//                CvPoint linehori = lineThroughPoint(&line2[0], &line2[1]);
-//                
-//                float rho1 = linevert.x;
-//                float theta1 = linevert.y;
-//                float rho2 = linehori.x;
-//                float theta2 = linehori.y;
-//                
-//                cvmSet(A, 0, 0, cos(theta1));
-//                cvmSet(A, 0, 1, sin(theta1));
-//                cvmSet(A, 1, 0, cos(theta2));
-//                cvmSet(A, 1, 1, sin(theta2));
-//                cvmSet(b, 0, 0, rho1);
-//                cvmSet(b, 1, 0, rho2);
-//                
-//                cvInvert(A, A1);
-//                cvMatMul(A1, b, x);
-                
                 double x0 = cvmGet(x, 0, 0);
-                double y0 = cvmGet(x, 1, 0);                
+                double y0 = cvmGet(x, 1, 0);
+                
+                if (pixels[int(x0)][int(y0)] < 2) {
+                    continue;
+                }
+                
                 float *line3 = (float*)cvGetSeqElem(vp,k);
                 float rho = line3[0];
                 float theta = line3[1];
