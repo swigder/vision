@@ -12,6 +12,7 @@
 using namespace cv;
 
 void hallway() {
+//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
     IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
     
     // need grayscale, 8-bit image for canny and hough
@@ -236,9 +237,9 @@ CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, C
                                      CV_HOUGH_PROBABILISTIC,
                                      1,
                                      CV_PI/180,
-                                     100,
-                                     0,
-                                     0);
+                                     5,
+                                     5,
+                                     5);
     
     for (int i = 0; i < linesProb->total; i++) {
         CvPoint* line = (CvPoint*)cvGetSeqElem(linesProb,i);
@@ -250,7 +251,7 @@ CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, C
         }
         if (line[0].y == line[1].y) {
             for (int j = min(line[0].x, line[1].x); j < max(line[0].x, line[1].x); j++) {
-                pixels[j][line[0].y]++;
+                pixels[j][line[0].y]+=2;
             } 
             cvLine(dst, line[0], line[1], CV_RGB(0,0,255), 1, 8);
         }
@@ -285,7 +286,21 @@ CvSeq *interVertHoriVP(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori, C
                 double x0 = cvmGet(x, 0, 0);
                 double y0 = cvmGet(x, 1, 0);
                 
-                if (pixels[int(x0)][int(y0)] < 2) {
+                int inter = 0;
+                for (int i = x0 - 1; i <= x0 + 1; i++) {
+                    for (int j = y0 - 1; j <= y0 + 1; j++) {
+                        if (pixels[i][j] == 3) {
+                            inter += 3;
+                        }
+                        else if (pixels[i][j] == 2 && inter != 2) {
+                            inter += 2;
+                        }
+                        else if (pixels[i][j] == 1 && inter != 1) {
+                            inter += 1;
+                        }
+                    }
+                }
+                if (inter < 3) {
                     continue;
                 }
                 
