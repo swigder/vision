@@ -63,9 +63,9 @@ void hallway() {
 
     drawLinesLines(vpLines, houghColorImg, CV_RGB(255,0,0));
     drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,0,255));
-    cvCircle(houghColorImg, point, 10, CV_RGB(0,255,0));
+    cvCircle(houghColorImg, vp, 10, CV_RGB(0,255,0));
     drawLinesLines(vpVert, houghColorImg, CV_RGB(0,0,255));
-    CvSeq* floorLines = getFloorEdges(vpLines, point);
+    CvSeq* floorLines = getFloorEdges(vpLines, vp);
     //drawLinesLines(floorLines, houghColorImg, CV_RGB(255,255,0), 2);
         
     // display what we've done
