@@ -12,8 +12,8 @@
 using namespace cv;
 
 void hallway() {
-//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
-    IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);
+    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway1.jpg", CV_LOAD_IMAGE_COLOR);    
+//    IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);
     
     // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
@@ -23,6 +23,7 @@ void hallway() {
     IplImage *cannyR = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
     IplImage *cannyG = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
     IplImage *cannyB = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
+    IplImage *cannyCombined = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
     
     // store the image with lines overlaid
     IplImage *houghColorImg = cvCreateImage(cvGetSize(srcImg), 8, 3);
@@ -42,6 +43,10 @@ void hallway() {
     cvCanny(srcR, cannyR, 50, 255);
     cvCanny(srcG, cannyG, 50, 255);
     cvCanny(srcB, cannyB, 50, 255);
+    
+    // let's combine the three RGB canny Images
+    cvAdd(cannyR, cannyG, cannyCombined);
+    cvAdd(cannyCombined, cannyB, cannyCombined);
 
     // hough to get lines
     CvSeq *lines = hough(cannyImg, houghColorImg);
@@ -50,7 +55,7 @@ void hallway() {
 //    CvSeq *vlines = removeNonInterVertLines(lines, src8bitgray);
     
     // get vertical line segments
-    CvSeq *vertlines = verticalLineSegments(cannyImg, houghColorImg);
+    CvSeq *vertlines = verticalLineSegments(cannyCombined, houghColorImg);
     
     // get vanishing point
     CvPoint point = vanishing(lines, houghColorImg);
@@ -79,17 +84,17 @@ void hallway() {
     cvNamedWindow("Hough", 1);
     cvShowImage("Hough", houghColorImg);
     
-    cvNamedWindow("Canny", 1);
-    cvShowImage("Canny", cannyImg);
+    cvNamedWindow("Canny Combined", 1);
+    cvShowImage("Canny Combined", cannyCombined);
     
-    cvNamedWindow("CannyR", 1);
-    cvShowImage("CannyR", cannyR);
-    
-    cvNamedWindow("CannyG", 1);
-    cvShowImage("CannyG", cannyG);
-    
-    cvNamedWindow("CannyB", 1);
-    cvShowImage("CannyB", cannyB);
+//    cvNamedWindow("CannyR", 1);
+//    cvShowImage("CannyR", cannyR);
+//    
+//    cvNamedWindow("CannyG", 1);
+//    cvShowImage("CannyG", cannyG);
+//    
+//    cvNamedWindow("CannyB", 1);
+//    cvShowImage("CannyB", cannyB);
     
     cvWaitKey();
 }
