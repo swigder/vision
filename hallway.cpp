@@ -50,42 +50,34 @@ void hallway() {
 
     // hough to get lines
     CvSeq *lines = hough(cannyImg, houghColorImg);
-    
-    // get lines with vertical intersection
-//    CvSeq *vlines = removeNonInterVertLines(lines, src8bitgray);
-    
+        
     // get vertical line segments
     CvSeq *vertlines = verticalLineSegments(cannyCombined, houghColorImg);
     
     // get vanishing point
-    CvPoint point = vanishing(lines, houghColorImg);
+    CvPoint vp = vanishing(lines, houghColorImg);
     
-    // get lines that go through vp
-    CvSeq *vpLines = linesThroughVp(lines, houghColorImg, &point);
-    
-    // get the vertical lines
-    CvMemStorage* storageVert = cvCreateMemStorage(0);
-    CvMemStorage* storageHori = cvCreateMemStorage(0);
-    
-    CvSeq *vert = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageVert);
-    CvSeq *hori = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageHori);
+    // get lines that go through vp, and those intersecting vertical
+    CvSeq *vpLines = linesThroughVp(lines, houghColorImg, &vp);
+    CvSeq *vpVert = linesIntersectingSegments(vpLines, vertlines);
 
     drawLinesLines(vpLines, houghColorImg, CV_RGB(255,0,0));
     drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,255,0));
-    cvCircle(houghColorImg, point, 10, CV_RGB(0,255,0));
+    drawLinesLines(vpVert, houghColorImg, CV_RGB(0,0,255));
+    cvCircle(houghColorImg, vp, 10, CV_RGB(0,255,0));
         
     // display what we've done
-//    cvNamedWindow("Source", 1);
-//    cvShowImage("Source", srcImg);
+    cvNamedWindow("Source", 1);
+    cvShowImage("Source", srcImg);
 //    
 //    cvNamedWindow("Canny", 1);
 //    cvShowImage("Canny", cannyImg);
     
-    cvNamedWindow("Hough", 1);
-    cvShowImage("Hough", houghColorImg);
-    
     cvNamedWindow("Canny Combined", 1);
     cvShowImage("Canny Combined", cannyCombined);
+
+    cvNamedWindow("Hough", 1);
+    cvShowImage("Hough", houghColorImg);
     
 //    cvNamedWindow("CannyR", 1);
 //    cvShowImage("CannyR", cannyR);
@@ -161,11 +153,7 @@ CvSeq *linesContainingPoint(CvSeq *lines, CvPoint *point) {
     int total = lines->total;
     for (int i = 0; i < total; i++) {
         float *line = (float*)cvGetSeqElem(lines,i);
-        float rho = line[0];
-        float theta = line[1];
-        
-        double exy = -cos(theta) / sin(theta) * point->x + rho / sin(theta);
-        if (exy == exy && (point->y - exy) < 5) {
+        if (lineContainsPoint(line, *point, 5)) {
             cvSeqPush(retLines, line);;
         }
     }
@@ -173,7 +161,7 @@ CvSeq *linesContainingPoint(CvSeq *lines, CvPoint *point) {
     return retLines;
 }
 
-CvPoint lineThroughPoint(CvPoint *pt1, CvPoint *pt2) {
+CvPoint lineThroughPoints(CvPoint *pt1, CvPoint *pt2) {
     CvMat *A = cvCreateMat(2, 2, CV_64FC1);
     CvMat *A1 = cvCreateMat(2, 2, CV_64FC1);
     CvMat *b = cvCreateMat(2, 1, CV_64FC1);
@@ -196,6 +184,14 @@ CvPoint lineThroughPoint(CvPoint *pt1, CvPoint *pt2) {
     double rho = rsint * sin(theta);
     
     return cvPoint(int(rho), int(theta));
+}
+
+bool lineContainsPoint(float *line, CvPoint point, int tolerance = 2) {
+    float rho = line[0];
+    float theta = line[1];
+    
+    double exy = -cos(theta) / sin(theta) * point.x + rho / sin(theta);
+    return exy == exy && abs(point.y - exy) < tolerance;
 }
 
 # pragma mark - vision
@@ -282,6 +278,8 @@ CvPoint vanishing(CvSeq *lines, IplImage *dst) {
     return vp;
 }
 
+#pragma mark intersecting
+
 CvSeq *linesIntersectingCorners(CvSeq *lines, IplImage *src) {
     CvMemStorage* storage = cvCreateMemStorage(0);
     CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storage);
@@ -329,9 +327,30 @@ CvSeq *linesThroughVp(CvSeq *lines, IplImage *img, CvPoint *vp) {
     return retLines;
 }
 
+CvSeq *linesIntersectingSegments(CvSeq *lines, CvSeq *segments) {
+    CvMemStorage* storage = cvCreateMemStorage(0);
+    CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storage);
+    
+    for (int i = 0; i < lines->total; i++) {
+        float *line = (float*)cvGetSeqElem(lines, i);
+
+        for (int j = 0; j < segments->total; j++) {
+            CvPoint* segment = (CvPoint*)cvGetSeqElem(segments, j);
+            
+            if (lineContainsPoint(line, segment[0], 5) || lineContainsPoint(line, segment[1], 5)) {
+                cvSeqPush(retLines, line);
+            }
+        }
+    }
+    
+    return retLines;
+}
+
+#pragma mark lines in direction
+
 CvSeq *verticalLineSegments(IplImage *src, IplImage *dst) {
     CvMemStorage* storageret = cvCreateMemStorage(0);
-    CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageret);
+    CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(CvPoint) * 2, storageret);
     
     IplImage *cannyImg = cvCreateImage(cvGetSize(src), IPL_DEPTH_8U, 1);
     cvCanny(src, cannyImg, 5, 10); 
@@ -342,18 +361,18 @@ CvSeq *verticalLineSegments(IplImage *src, IplImage *dst) {
                                  CV_HOUGH_PROBABILISTIC,
                                  1,
                                  CV_PI/180,
-                                 30,
-                                 30,
-                                 30);
+                                 50,
+                                 50,
+                                 70);
     
     for (int i = 0; i < lines->total; i++ ) {
         CvPoint* line = (CvPoint*)cvGetSeqElem(lines, i);
-        if (line[0].x == line[1].x) {
+        if (abs(line[0].x - line[1].x) < 5) {
             cvSeqPush(retLines, line);
         }
     }
     
-    return lines;
+    return retLines;
 }
 
 void verticalHorizontalLines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori) {

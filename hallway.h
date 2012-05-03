@@ -18,7 +18,8 @@ CvSeq *hough(IplImage *src, IplImage *dst);
 
 CvSeq *linesContainingPoint(CvSeq *lines, CvPoint *point);
 CvSeq *linesContainingPoints(CvSeq *lines, CvSeq *points);
-CvPoint lineThroughPoint(CvPoint *pt1, CvPoint *pt2);
+CvPoint lineThroughPoints(CvPoint *pt1, CvPoint *pt2);
+bool lineContainsPoint(float *line, CvPoint point, int tolerance);
 
 void drawLinesPoints(CvSeq *lines, IplImage *img, CvScalar color);
 void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color);
@@ -27,6 +28,7 @@ CvPoint vanishing(CvSeq *lines, IplImage *dst);
 
 CvSeq *linesIntersectingCorners(CvSeq *lines, IplImage *src);
 CvSeq *linesThroughVp(CvSeq *lines, IplImage *img, CvPoint *vp);
+CvSeq *linesIntersectingSegments(CvSeq *lines, CvSeq *segments);
 
 CvSeq *verticalLineSegments(IplImage *src, IplImage *dst);
 void verticalHorizontalLines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori);
