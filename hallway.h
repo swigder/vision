@@ -29,6 +29,7 @@ CvPoint vanishing(CvSeq *lines, IplImage *dst);
 CvSeq *linesIntersectingCorners(CvSeq *lines, IplImage *src);
 CvSeq *linesThroughVp(CvSeq *lines, IplImage *img, CvPoint *vp);
 CvSeq *linesIntersectingSegments(CvSeq *lines, CvSeq *segments);
+CvSeq *linesIntersectingSegmentsBelowVP(CvSeq *lines, CvSeq *segments, CvPoint vp);
 
 CvSeq *verticalLineSegments(IplImage *src, IplImage *dst);
 void verticalHorizontalLines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori);

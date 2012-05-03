@@ -13,7 +13,7 @@ using namespace cv;
 
 void hallway() {
     IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);    
-//    IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);
+//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway5.jpg", CV_LOAD_IMAGE_COLOR);    
     
     // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
@@ -59,14 +59,18 @@ void hallway() {
     
     // get lines that go through vp, and those intersecting vertical
     CvSeq *vpLines = linesThroughVp(lines, houghColorImg, &vp);
-    CvSeq *vpVert = linesIntersectingSegments(vpLines, vertlines);
+    CvSeq *vpVert = linesIntersectingSegmentsBelowVP(vpLines, vertlines, vp);
 
     drawLinesLines(vpLines, houghColorImg, CV_RGB(255,0,0));
     drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,0,255));
     cvCircle(houghColorImg, vp, 10, CV_RGB(0,255,0));
     drawLinesLines(vpVert, houghColorImg, CV_RGB(0,0,255));
     CvSeq* floorLines = getFloorEdges(vpLines, vp);
-    //drawLinesLines(floorLines, houghColorImg, CV_RGB(255,255,0), 2);
+    drawLinesLines(floorLines, houghColorImg, CV_RGB(255,255,0), 2);
+        
+//    drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,255,0));
+//    drawLinesLines(vpVert, houghColorImg, CV_RGB(0,0,255));
+//    cvCircle(houghColorImg, vp, 10, CV_RGB(0,255,0));
         
     // display what we've done
     cvNamedWindow("Source", 1);
@@ -196,6 +200,7 @@ bool lineContainsPoint(float *line, CvPoint point, int tolerance = 2) {
     return exy == exy && abs(point.y - exy) < tolerance;
 }
 
+
 # pragma mark - vision
 
 CvSeq *hough(IplImage *src, IplImage *dst) {
@@ -206,7 +211,7 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
                           CV_HOUGH_STANDARD,
                           1,
                           CV_PI/180,
-                          100,
+                          80,
                           0,
                           0);
     
@@ -348,6 +353,29 @@ CvSeq *linesIntersectingSegments(CvSeq *lines, CvSeq *segments) {
     return retLines;
 }
 
+CvSeq *linesIntersectingSegmentsBelowVP(CvSeq *lines, CvSeq *segments, CvPoint vp) {
+    CvMemStorage* storage = cvCreateMemStorage(0);
+    CvSeq *retLines = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storage);
+    
+    for (int i = 0; i < lines->total; i++) {
+        float *line = (float*)cvGetSeqElem(lines, i);
+        
+        for (int j = 0; j < segments->total; j++) {
+            CvPoint* segment = (CvPoint*)cvGetSeqElem(segments, j);
+            
+            if (segment[0].y > vp.y && lineContainsPoint(line, segment[0], 5)) {
+                cvSeqPush(retLines, line);
+            }
+            else if (segment[1].y > vp.y && lineContainsPoint(line, segment[1], 5)) {
+                cvSeqPush(retLines, line);
+            }
+        }
+    }
+    
+    return retLines;
+    
+}
+
 #pragma mark lines in direction
 
 CvSeq *verticalLineSegments(IplImage *src, IplImage *dst) {
@@ -365,7 +393,7 @@ CvSeq *verticalLineSegments(IplImage *src, IplImage *dst) {
                                  CV_PI/180,
                                  50,
                                  50,
-                                 70);
+                                 15);
     
     for (int i = 0; i < lines->total; i++ ) {
         CvPoint* line = (CvPoint*)cvGetSeqElem(lines, i);
