@@ -12,7 +12,7 @@
 using namespace cv;
 
 void hallway() {
-    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway1.jpg", CV_LOAD_IMAGE_COLOR);    
+    IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);    
 //    IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);
     
     // need grayscale, 8-bit image for canny and hough
@@ -71,8 +71,10 @@ void hallway() {
     CvSeq *hori = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageHori);
 
     drawLinesLines(vpLines, houghColorImg, CV_RGB(255,0,0));
-    drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,255,0));
+    drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,0,255));
     cvCircle(houghColorImg, point, 10, CV_RGB(0,255,0));
+    CvSeq* floorLines = getFloorEdges(vpLines, point);
+    //drawLinesLines(floorLines, houghColorImg, CV_RGB(255,255,0), 2);
         
     // display what we've done
 //    cvNamedWindow("Source", 1);
@@ -104,11 +106,11 @@ void hallway() {
 void drawLinesPoints(CvSeq *lines, IplImage *img, CvScalar color = CV_RGB(255,0,0)) {    
     for (int i = 0; i < lines->total; i++ ) {
         CvPoint* line = (CvPoint*)cvGetSeqElem(lines, i);
-        cvLine(img, line[0], line[1], color, 3, 8 );
+        cvLine(img, line[0], line[1], color, 1, 8 );
     }
 }
 
-void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color = CV_RGB(255,0,0)) {
+void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color = CV_RGB(255,0,0), int lineWidth /* =1 */) {
     int total = lines->total;
     for (int i = 0; i < total; i++) {
         float *line = (float*)cvGetSeqElem(lines,i);
@@ -123,7 +125,7 @@ void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color = CV_RGB(255,0,0
         pt2.x = cvRound(x0 - 1000*(-b));
         pt2.y = cvRound(y0 - 1000*(a));
         
-        cvLine(img, pt1, pt2, color, 1, 8);
+        cvLine(img, pt1, pt2, color, lineWidth, 8);
     }    
 }
 
@@ -348,12 +350,12 @@ CvSeq *verticalLineSegments(IplImage *src, IplImage *dst) {
     
     for (int i = 0; i < lines->total; i++ ) {
         CvPoint* line = (CvPoint*)cvGetSeqElem(lines, i);
-        if (line[0].x == line[1].x) {
+        if (abs(line[0].x - line[1].x) < 10) {
             cvSeqPush(retLines, line);
         }
     }
     
-    return lines;
+    return retLines;
 }
 
 void verticalHorizontalLines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori) {
@@ -391,4 +393,90 @@ void verticalHorizontalLines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *h
             cvSeqPush(hori, line);
         }
     }
+}
+
+CvSeq *getFloorEdges(CvSeq *originalLines, CvPoint vp) {
+    int i, j;
+    //Get all lines that pass nearby the vanishing point.
+    CvSeq *vpLines = linesContainingPoint(originalLines, &vp);
+    
+    CvMemStorage* storageFloorEdges = cvCreateMemStorage(0);
+    CvSeq *floorEdges = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageFloorEdges);
+    
+    double rho, theta, current_theta = CV_PI / 2;
+    int current_line = -1;
+    for(i = 0; i < originalLines->total; i++){
+        float *line = (float*)cvGetSeqElem(originalLines,i);
+        float rho = line[0];
+        float theta = line[1];
+        if(theta > current_theta && theta < CV_PI){
+            current_line = i;
+            current_theta = theta;
+        }
+    }
+    if(current_line != -1){
+        float *line = (float*)cvGetSeqElem(originalLines,current_line);
+        cvSeqPush(floorEdges, line);
+    }
+    
+    current_theta = CV_PI / 2;
+    current_line = -1;
+    for(i = 0; i < originalLines->total; i++){
+        float *line = (float*)cvGetSeqElem(originalLines,i);
+        float rho = line[0];
+        float theta = line[1];
+        if(theta < current_theta && theta > 0){
+            current_line = i;
+            current_theta = theta;
+        }
+    }
+    if(current_line != -1){
+        float *line = (float*)cvGetSeqElem(originalLines,current_line);
+        cvSeqPush(floorEdges, line);
+    }
+    
+    return floorEdges;
+}
+
+CvSeq *getFloorEdgesWithVertPass(CvSeq *originalLines, CvSeq *vertSegments, CvPoint vp) {
+    int i, j;
+    //Get all lines that pass nearby the vanishing point.
+    CvSeq *vpLines = linesContainingPoint(originalLines, &vp);
+    
+    CvMemStorage* storageFloorEdges = cvCreateMemStorage(0);
+    CvSeq *floorEdges = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageFloorEdges);
+    
+    double rho, theta, current_theta = CV_PI / 2;
+    int current_line = -1;
+    for(i = 0; i < originalLines->total; i++){
+        float *line = (float*)cvGetSeqElem(originalLines,i);
+        float rho = line[0];
+        float theta = line[1];
+        if(theta > current_theta && theta < CV_PI){
+            current_line = i;
+            current_theta = theta;
+        }
+    }
+    if(current_line != -1){
+        float *line = (float*)cvGetSeqElem(originalLines,current_line);
+        cvSeqPush(floorEdges, line);
+    }
+    
+    current_theta = CV_PI / 2;
+    current_line = -1;
+    for(i = 0; i < originalLines->total; i++){
+        float *line = (float*)cvGetSeqElem(originalLines,i);
+        float rho = line[0];
+        float theta = line[1];
+        if(theta < current_theta && theta > 0){
+            current_line = i;
+            current_theta = theta;
+        }
+    }
+    if(current_line != -1){
+        float *line = (float*)cvGetSeqElem(originalLines,current_line);
+        cvSeqPush(floorEdges, line);
+    }
+    
+    return floorEdges;
 }
