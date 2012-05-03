@@ -22,7 +22,7 @@ CvPoint lineThroughPoints(CvPoint *pt1, CvPoint *pt2);
 bool lineContainsPoint(float *line, CvPoint point, int tolerance);
 
 void drawLinesPoints(CvSeq *lines, IplImage *img, CvScalar color);
-void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color);
+void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color, int lineWidth = 1);
 
 CvPoint vanishing(CvSeq *lines, IplImage *dst);
 
@@ -32,5 +32,7 @@ CvSeq *linesIntersectingSegments(CvSeq *lines, CvSeq *segments);
 
 CvSeq *verticalLineSegments(IplImage *src, IplImage *dst);
 void verticalHorizontalLines(IplImage *src, IplImage *dst, CvSeq *vert, CvSeq *hori);
+
+CvSeq *getFloorEdges(CvSeq *originalLines, CvPoint vp); 
 
 #endif
