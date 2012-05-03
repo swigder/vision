@@ -13,13 +13,16 @@ using namespace cv;
 
 void hallway() {
 //    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/ushall1.jpg", CV_LOAD_IMAGE_COLOR);    
-    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway2.jpg", CV_LOAD_IMAGE_COLOR);
+    IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);
     
     // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
     
     // store the canny edges
     IplImage *cannyImg = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
+    IplImage *cannyR = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
+    IplImage *cannyG = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
+    IplImage *cannyB = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
     
     // store the image with lines overlaid
     IplImage *houghColorImg = cvCreateImage(cvGetSize(srcImg), 8, 3);
@@ -27,9 +30,18 @@ void hallway() {
     
     // need grayscale, 8-bit image for canny and hough
     cvCvtColor(srcImg, src8bitgray, CV_BGR2GRAY);
+
+    //Get color channels.
+    IplImage *srcR = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
+    IplImage *srcG = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
+    IplImage *srcB = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
+    cvSplit(srcImg, srcB, srcG, srcR, NULL);
     
     // canny edge detection
-    cvCanny(src8bitgray, cannyImg, 50, 255); 
+    cvCanny(src8bitgray, cannyImg, 50, 255);
+    cvCanny(srcR, cannyR, 50, 255);
+    cvCanny(srcG, cannyG, 50, 255);
+    cvCanny(srcB, cannyB, 50, 255);
 
     // hough to get lines
     CvSeq *lines = hough(cannyImg, houghColorImg);
@@ -38,7 +50,7 @@ void hallway() {
 //    CvSeq *vlines = removeNonInterVertLines(lines, src8bitgray);
     
     // get vertical line segments
-    CvSeq *vertlines = verticalLineSegments(src8bitgray, houghColorImg);
+    CvSeq *vertlines = verticalLineSegments(cannyImg, houghColorImg);
     
     // get vanishing point
     CvPoint point = vanishing(lines, houghColorImg);
@@ -53,7 +65,9 @@ void hallway() {
     CvSeq *vert = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageVert);
     CvSeq *hori = cvCreateSeq(0, sizeof(CvSeq), sizeof(float) * 3, storageHori);
 
-    verticalHorizontalLines(src8bitgray, houghColorImg, vert, hori);
+    drawLinesLines(vpLines, houghColorImg, CV_RGB(255,0,0));
+    drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,255,0));
+    cvCircle(houghColorImg, point, 10, CV_RGB(0,255,0));
         
     // display what we've done
 //    cvNamedWindow("Source", 1);
@@ -64,6 +78,18 @@ void hallway() {
     
     cvNamedWindow("Hough", 1);
     cvShowImage("Hough", houghColorImg);
+    
+    cvNamedWindow("Canny", 1);
+    cvShowImage("Canny", cannyImg);
+    
+    cvNamedWindow("CannyR", 1);
+    cvShowImage("CannyR", cannyR);
+    
+    cvNamedWindow("CannyG", 1);
+    cvShowImage("CannyG", cannyG);
+    
+    cvNamedWindow("CannyB", 1);
+    cvShowImage("CannyB", cannyB);
     
     cvWaitKey();
 }
@@ -92,7 +118,7 @@ void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color = CV_RGB(255,0,0
         pt2.x = cvRound(x0 - 1000*(-b));
         pt2.y = cvRound(y0 - 1000*(a));
         
-        cvLine(img, pt1, pt2, color, 2, 8);
+        cvLine(img, pt1, pt2, color, 1, 8);
     }    
 }
 
@@ -261,13 +287,13 @@ CvSeq *linesIntersectingCorners(CvSeq *lines, IplImage *src) {
     CvPoint2D32f *corners;
     
     eig_img = cvCreateImage (cvGetSize(src), IPL_DEPTH_32F, 1);
-	temp_img = cvCreateImage(cvGetSize (src), IPL_DEPTH_32F, 1);
-	corners = (CvPoint2D32f *)cvAlloc(corner_count * sizeof(CvPoint2D32f));
+        temp_img = cvCreateImage(cvGetSize (src), IPL_DEPTH_32F, 1);
+        corners = (CvPoint2D32f *)cvAlloc(corner_count * sizeof(CvPoint2D32f));
     
-	cvGoodFeaturesToTrack (src, eig_img, temp_img, corners, &corner_count, 0.1, 15);
-	cvFindCornerSubPix (src, corners, corner_count,
+        cvGoodFeaturesToTrack (src, eig_img, temp_img, corners, &corner_count, 0.1, 15);
+        cvFindCornerSubPix (src, corners, corner_count,
                         cvSize (3, 3), cvSize (-1, -1), cvTermCriteria (CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.03));
-	
+        
     IplImage *cannyImg = cvCreateImage(cvGetSize(src), IPL_DEPTH_8U, 1);
     cvCanny(src, cannyImg, 50, 255); 
     
@@ -311,9 +337,9 @@ CvSeq *verticalLineSegments(IplImage *src, IplImage *dst) {
                                  CV_HOUGH_PROBABILISTIC,
                                  1,
                                  CV_PI/180,
-                                 50,
-                                 10,
-                                 0);
+                                 30,
+                                 30,
+                                 30);
     
     for (int i = 0; i < lines->total; i++ ) {
         CvPoint* line = (CvPoint*)cvGetSeqElem(lines, i);
