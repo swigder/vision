@@ -23,6 +23,7 @@ bool lineContainsPoint(float *line, CvPoint point, int tolerance);
 
 void drawLinesPoints(CvSeq *lines, IplImage *img, CvScalar color);
 void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color, int lineWidth = 1);
+void colorFloor(IplImage *img, CvScalar color, CvSeq *lines);
 
 CvPoint vanishing(CvSeq *lines, IplImage *dst);
 

@@ -12,11 +12,16 @@
 using namespace cv;
 
 void hallway() {
-    IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);    
-//    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway5.jpg", CV_LOAD_IMAGE_COLOR);    
+//    IplImage *srcImg = cvLoadImage("hallway1.jpg", CV_LOAD_IMAGE_COLOR);    
+    IplImage *srcImg = cvLoadImage("/Users/xx/Documents/school/vision/project/vision/vision/hallway9.jpg", CV_LOAD_IMAGE_COLOR);    
     
     // need grayscale, 8-bit image for canny and hough
     IplImage *src8bitgray = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1); 
+    cvCvtColor(srcImg, src8bitgray, CV_BGR2GRAY);
+    
+    // store the image with lines overlaid
+    IplImage *houghColorImg = cvCreateImage(cvGetSize(srcImg), 8, 3);
+    cvCopy(srcImg, houghColorImg);
     
     // store the canny edges
     IplImage *cannyImg = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
@@ -24,14 +29,7 @@ void hallway() {
     IplImage *cannyG = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
     IplImage *cannyB = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
     IplImage *cannyCombined = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
-    
-    // store the image with lines overlaid
-    IplImage *houghColorImg = cvCreateImage(cvGetSize(srcImg), 8, 3);
-    cvCopy(srcImg, houghColorImg);
-    
-    // need grayscale, 8-bit image for canny and hough
-    cvCvtColor(srcImg, src8bitgray, CV_BGR2GRAY);
-
+        
     //Get color channels.
     IplImage *srcR = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
     IplImage *srcG = cvCreateImage(cvGetSize(srcImg), IPL_DEPTH_8U, 1);
@@ -61,21 +59,18 @@ void hallway() {
     CvSeq *vpLines = linesThroughVp(lines, houghColorImg, &vp);
     CvSeq *vpVert = linesIntersectingSegmentsBelowVP(vpLines, vertlines, vp);
 
+//    drawLinesLines(lines, houghColorImg, CV_RGB(0,255,0));
     drawLinesLines(vpLines, houghColorImg, CV_RGB(255,0,0));
     drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,0,255));
     cvCircle(houghColorImg, vp, 10, CV_RGB(0,255,0));
-    drawLinesLines(vpVert, houghColorImg, CV_RGB(0,0,255));
-    CvSeq* floorLines = getFloorEdges(vpLines, vp);
-    drawLinesLines(floorLines, houghColorImg, CV_RGB(255,255,0), 2);
-        
-//    drawLinesPoints(vertlines, houghColorImg, CV_RGB(0,255,0));
 //    drawLinesLines(vpVert, houghColorImg, CV_RGB(0,0,255));
-//    cvCircle(houghColorImg, vp, 10, CV_RGB(0,255,0));
-        
+    CvSeq* floorLines = getFloorEdges(vpVert, vp);
+    drawLinesLines(floorLines, houghColorImg, CV_RGB(255,255,0), 2);
+                
     // display what we've done
     cvNamedWindow("Source", 1);
     cvShowImage("Source", srcImg);
-//    
+    
 //    cvNamedWindow("Canny", 1);
 //    cvShowImage("Canny", cannyImg);
     
@@ -123,6 +118,10 @@ void drawLinesLines(CvSeq *lines, IplImage *img, CvScalar color = CV_RGB(255,0,0
         
         cvLine(img, pt1, pt2, color, lineWidth, 8);
     }    
+}
+
+void colorFloor(IplImage *img, CvScalar color, CvSeq *lines) {
+    // there will always be TWO lines + image bottom (for now)
 }
 
 #pragma mark helper geometric functions
@@ -211,7 +210,7 @@ CvSeq *hough(IplImage *src, IplImage *dst) {
                           CV_HOUGH_STANDARD,
                           1,
                           CV_PI/180,
-                          80,
+                          75,
                           0,
                           0);
     
@@ -391,9 +390,9 @@ CvSeq *verticalLineSegments(IplImage *src, IplImage *dst) {
                                  CV_HOUGH_PROBABILISTIC,
                                  1,
                                  CV_PI/180,
-                                 50,
-                                 50,
-                                 15);
+                                 25,
+                                 25,
+                                 10);
     
     for (int i = 0; i < lines->total; i++ ) {
         CvPoint* line = (CvPoint*)cvGetSeqElem(lines, i);
